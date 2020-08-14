@@ -1,10 +1,8 @@
-#define ASMJIT_STATIC
-#include <asmjit/asmjit.h>
-
 #include <boost/config/warning_disable.hpp>
 
 #include "grammar.hpp"
 #include "eval.hpp"
+#include "jit_eval.hpp"
 
 #include <list>
 #include <numeric>
@@ -12,31 +10,15 @@
 #include <stdio.h>
 #include <iostream>
 #include <string>
+#include <chrono>
 
-using namespace asmjit;
+void micro_bench(std::function<void(void)> _fun, uint32_t n = 1000) {
+    auto start = std::chrono::high_resolution_clock::now();
+    for(uint32_t i = 0; i < n; i++) _fun();
+    auto end = std::chrono::high_resolution_clock::now();
 
-typedef int (*Func)(void);
+    std::cout << std::chrono::duration_cast<std::chrono::microseconds>(end-start).count() / static_cast<double>(n) << "us" << std::endl;
 
-int test_asmjit() {
-  JitRuntime rt;
-
-  CodeHolder code;
-  code.init(rt.environment());
-
-  x86::Assembler a(&code);
-  a.mov(x86::eax, 1);
-  a.ret();
-
-  Func fn;
-  Error err = rt.add(&fn, &code);
-  if (err) return 1;
-
-  int result = fn();
-  printf("%d\n", result);
-
-  rt.release(fn);
-
-  return 0;
 }
 
 int test_spirit()
@@ -62,6 +44,7 @@ int test_spirit()
         client::ast::expr e;
         client::ast::printer print;
         client::ast::eval eval;
+        client::ast::jit_eval jit;
         bool r = phrase_parse(iter, end, calc, space, e);
 
         if (r && iter == end)
@@ -71,6 +54,12 @@ int test_spirit()
             std::cout << "-------------------------\n";
             print(e);
             std::cout << "\n" << eval(e) << std::endl;
+            jit.eval(e);
+            std::cout << "\nJIT RESULT: " << jit.compute() << std::endl;
+
+            micro_bench([&]() {eval(e);});
+            
+            micro_bench([&]() {jit.compute();});
         }
         else
         {
@@ -89,6 +78,8 @@ int main()
 {
     //test_asmjit();
     test_spirit();
+
+    //client::ast::jit_eval eval;
 
     return 0;
 }
