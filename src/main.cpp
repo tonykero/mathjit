@@ -2,12 +2,10 @@
 #include <asmjit/asmjit.h>
 
 #include <boost/config/warning_disable.hpp>
-#include <boost/spirit/home/x3.hpp>
-#include <boost/spirit/home/x3/support/ast/variant.hpp>
-#include <boost/fusion/include/adapt_struct.hpp>
 
-#include <iostream>
-#include <string>
+#include "grammar.hpp"
+#include "eval.hpp"
+
 #include <list>
 #include <numeric>
 
@@ -41,135 +39,6 @@ int test_asmjit() {
   return 0;
 }
 
-namespace x3 = boost::spirit::x3;
-
-namespace client
-{
-    namespace ast {
-
-        struct nil {};
-        struct expr;
-        struct un_op;
-        struct operand;
-
-        struct operand : x3::variant<nil,
-                                    double,
-                                    x3::forward_ast<un_op>,
-                                    x3::forward_ast<expr>
-                                    >
-        {
-            using base_type::base_type;
-            using base_type::operator=;
-        };
-
-        struct expr {
-            operand first;
-            std::vector<un_op> ops;
-            };
-
-        struct un_op {
-            char op;
-            operand _operand;
-        };
-
-        struct printer {
-            void operator()(nil) const      {}
-            void operator()(double n) const { std::cout << n;}
-            void operator()(un_op op) const {
-                boost::apply_visitor(*this, op._operand);
-                std::cout << op.op;
-            }
-            void operator()(expr e) const {
-                boost::apply_visitor(*this, e.first);
-                for(const un_op& op : e.ops) {
-                    (*this)(op);
-                }
-            }
-        };
-
-        struct eval {
-            double operator()(nil) const      { return 0;}
-            double operator()(double n) const { return n;}
-            double operator()(un_op op) const {
-                double rhs = boost::apply_visitor(*this, op._operand);
-                switch(op.op) {
-                    case '+': return +rhs;
-                    case '-': return -rhs;
-                }
-                return 0;
-            }
-            double operator()(un_op op, double state) const {
-                double rhs = boost::apply_visitor(*this, op._operand);
-                switch(op.op) {
-                    case '+': return state+rhs;
-                    case '-': return state-rhs;
-                    case '*': return state*rhs;
-                    case '/': return state/rhs;
-                    case '^': return std::pow(state,rhs);
-                }
-                return 0;
-            }
-            double operator()(expr e) const {
-                double state = boost::apply_visitor(*this, e.first);
-                for(const un_op& op : e.ops) {
-                    state = (*this)(op, state);
-                }
-                return state;
-            }
-        };
-    }
-}
-
-BOOST_FUSION_ADAPT_STRUCT(client::ast::expr, first, ops);
-BOOST_FUSION_ADAPT_STRUCT(client::ast::un_op, op, _operand);
-
-namespace client {
-    namespace calculator_grammar
-    {
-        using x3::uint_;
-        using x3::char_;
-        using x3::double_;
-
-        x3::rule<class expr, ast::expr> const expr("expr");
-        x3::rule<class term, ast::expr> const term("term");
-        x3::rule<class factor, ast::operand> const factor("factor");
-
-
-
-        auto const expr_def =
-            term >> *( 
-                        (char_('+') >> term) |
-                        (char_('-') >> term)
-                    )
-            ;
-
-        auto const term_def =
-            factor >> *( 
-                        (char_('*') >> term) |
-                        (char_('/') >> term) |
-                        (char_('^') >> term)
-                    )
-            ;
-        auto const factor_def =
-            double_             |
-            '(' >> expr >> ')'  |
-            char_('+') >> factor       |
-            char_('-') >> factor
-            ;
-
-        BOOST_SPIRIT_DEFINE(
-            expr,
-            term,
-            factor
-        );
-
-        auto calculator = expr;
-    }
-
-    using calculator_grammar::calculator;
-
-}
-
 int test_spirit()
 {
     std::cout << "/////////////////////////////////////////////////////////\n\n";
@@ -201,7 +70,7 @@ int test_spirit()
             std::cout << "Parsing succeeded\n";
             std::cout << "-------------------------\n";
             print(e);
-            std::cout << "\n" << eval(e);
+            std::cout << "\n" << eval(e) << std::endl;
         }
         else
         {
