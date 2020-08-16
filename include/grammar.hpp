@@ -11,6 +11,8 @@ namespace client {
 
         x3::rule<class expr, ast::expr> const expr("expr");
         x3::rule<class term, ast::expr> const term("term");
+        x3::rule<class exp, ast::expr> const exp("exp");
+        
         x3::rule<class factor, ast::operand> const factor("factor");
 
         auto const expr_def =
@@ -19,14 +21,19 @@ namespace client {
                         (char_('-') >> term)
                     )
             ;
-
         auto const term_def =
-            factor >> *( 
-                        (char_('*') >> term) |
-                        (char_('/') >> term) |
-                        (char_('^') >> term)
+            exp >> *( 
+                        (char_('*') >> exp) |
+                        (char_('/') >> exp)
                     )
             ;
+
+        auto const exp_def = 
+            factor >> *(
+                        (char_('^') >> factor)
+                    )
+            ;
+        
         auto const factor_def =
             double_             |
             '(' >> expr >> ')'  |
@@ -37,7 +44,8 @@ namespace client {
         BOOST_SPIRIT_DEFINE(
             expr,
             term,
-            factor
+            factor,
+            exp
         );
 
         auto calculator = expr;

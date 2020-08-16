@@ -128,6 +128,3 @@ namespace client {
         };
     }
 }
-
-// 16/4*12
-// not working
