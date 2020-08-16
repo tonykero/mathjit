@@ -12,6 +12,7 @@ using namespace asmjit;
 
 namespace client {
     namespace ast {
+
         struct jit_eval {
             
             typedef double (*fun_type)(void);
@@ -48,6 +49,30 @@ namespace client {
                 return fn();
             }
 
+            template<typename T, typename... Args>
+            Error invoke(T(*fun_ptr)(Args...), std::initializer_list<x86::Xmm> list) const {
+                uint64_t fun_ptr_int = reinterpret_cast<uint64_t>(fun_ptr);
+                InvokeNode* invokeNode;
+                Error err = cc_ptr->invoke(&invokeNode, fun_ptr_int, FuncSignatureT<T, Args...>());
+                uint32_t index = 0;
+                for(const x86::Xmm* it = list.begin(); it != list.end(); it++) {
+                    if(it == list.begin()) { invokeNode->setRet(0, *it); }
+                    else
+                    {
+                        invokeNode->setArg(index, *it);
+                        index++;
+                    }
+                }
+
+                return err;
+            }
+            Error invoke2d(double(*fun_ptr)(double, double), std::initializer_list<x86::Xmm> list) const {
+                return invoke(fun_ptr, list);
+            }
+            Error invoke1d(double(*fun_ptr)(double), std::initializer_list<x86::Xmm> list) const {
+                return invoke(fun_ptr, list);
+            }
+            
             x86::Xmm operator()(nil) const      {
                 return (*this)(0.0);
             }
@@ -86,7 +111,9 @@ namespace client {
                     case '/':
                     cc_ptr->divsd(state, rhs);
                     return state;
-                    //case '^': return std::pow(state,rhs);
+                    case '^':
+                    invoke2d(&(std::pow), {state, state, rhs});
+                    return state;
                 }
                 // unreachable
                 return state;
@@ -101,3 +128,6 @@ namespace client {
         };
     }
 }
+
+// 16/4*12
+// not working
