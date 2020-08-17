@@ -13,10 +13,12 @@ using namespace asmjit;
 namespace client {
     namespace ast {
 
-        struct jit_eval {
+        struct jit_eval : public visitor<x86::Xmm> {
             
             typedef double (*fun_type)(void);
             private:
+                std::unordered_map<char, double> vars_map;
+
                 JitRuntime rt;
                 CodeHolder code;
                 std::unique_ptr<x86::Compiler> cc_ptr;
@@ -25,7 +27,7 @@ namespace client {
             public:
 
 
-            jit_eval() : rt(), code() {
+            jit_eval(const decltype(vars_map)& _vars_map) : vars_map(_vars_map), rt(), code() {
                 code.init(rt.environment());
                 cc_ptr = std::make_unique<x86::Compiler>(&code);
 
@@ -80,6 +82,9 @@ namespace client {
                 x86::Xmm r = cc_ptr->newXmmSd();
                 cc_ptr->movsd(r, cc_ptr->newDoubleConst(ConstPool::kScopeLocal, n));
                 return r;
+            }
+            x86::Xmm operator()(char var) const {
+                return (*this)(vars_map.at(var));
             }
             x86::Xmm operator()(un_op op) const {
                 x86::Xmm rhs = boost::apply_visitor(*this, op._operand);

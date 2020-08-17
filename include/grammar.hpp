@@ -8,12 +8,12 @@ namespace client {
         using x3::uint_;
         using x3::char_;
         using x3::double_;
+        using x3::alpha;
 
-        x3::rule<class expr, ast::expr> const expr("expr");
-        x3::rule<class term, ast::expr> const term("term");
-        x3::rule<class exp, ast::expr> const exp("exp");
-        
-        x3::rule<class factor, ast::operand> const factor("factor");
+        const x3::rule<class expr,  ast::expr>  expr("expr");
+        const x3::rule<class term,  ast::expr>  term("term");
+        const x3::rule<class exp,   ast::expr>  exp("exp");
+        const x3::rule<class factor, ast::operand> factor("factor");
 
         auto const expr_def =
             term >> *( 
@@ -37,7 +37,8 @@ namespace client {
         auto const factor_def =
             double_             |
             '(' >> expr >> ')'  |
-            char_('+') >> factor       |
+            alpha               |
+            char_('+') >> factor|
             char_('-') >> factor
             ;
 

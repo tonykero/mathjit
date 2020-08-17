@@ -19,6 +19,7 @@ namespace client
 
         struct operand : x3::variant<nil,
                                     double,
+                                    char,
                                     x3::forward_ast<un_op>,
                                     x3::forward_ast<expr>
                                     >
@@ -37,14 +38,23 @@ namespace client
             operand _operand;
         };
 
-        struct printer {
-            void operator()(nil) const      {}
-            void operator()(double n) const { std::cout << n;}
-            void operator()(un_op op) const {
+        template<typename T>
+        struct visitor {
+            virtual T operator()(nil)        const = 0;
+            virtual T operator()(double n)   const = 0;
+            virtual T operator()(char var)   const = 0;
+            virtual T operator()(un_op op)   const = 0;
+            virtual T operator()(expr e)     const = 0;
+        };
+        struct printer : public visitor<void> {
+            void operator()(nil)        const {}
+            void operator()(double n)   const { std::cout << n;}
+            void operator()(char var)   const { std::cout << var;}
+            void operator()(un_op op)   const {
                 boost::apply_visitor(*this, op._operand);
                 std::cout << op.op;
             }
-            void operator()(expr e) const {
+            void operator()(expr e)     const {
                 boost::apply_visitor(*this, e.first);
                 for(const un_op& op : e.ops) {
                     (*this)(op);

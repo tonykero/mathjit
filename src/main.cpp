@@ -41,10 +41,16 @@ int test_spirit()
         iterator_type iter = str.begin();
         iterator_type end = str.end();
         boost::spirit::x3::ascii::space_type space;
+
         client::ast::expr e;
         client::ast::printer print;
-        client::ast::eval eval;
-        client::ast::jit_eval jit;
+
+        std::unordered_map<char, double> vars = {
+            {'x', 12.5},
+            {'y', 1.0/3.0}
+        };
+        client::ast::eval<> eval(vars);
+        client::ast::jit_eval jit(vars);
         bool r = phrase_parse(iter, end, calc, space, e);
 
         if (r && iter == end)
@@ -76,10 +82,7 @@ int test_spirit()
 
 int main()
 {
-    //test_asmjit();
     test_spirit();
-
-    //client::ast::jit_eval eval;
 
     return 0;
 }
