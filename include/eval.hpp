@@ -4,7 +4,7 @@
 
 #include "ast.hpp"
 
-namespace client {
+namespace mathjit {
     namespace ast {
         template<typename T = double>
         struct eval : public visitor<T> {

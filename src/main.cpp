@@ -1,13 +1,9 @@
 #include <boost/config/warning_disable.hpp>
 
-#include "grammar.hpp"
-#include "eval.hpp"
-#include "jit_eval.hpp"
+#include "mathjit.hpp"
 
 #include <list>
 #include <numeric>
-
-#include <stdio.h>
 #include <iostream>
 #include <string>
 #include <chrono>
@@ -18,7 +14,6 @@ void micro_bench(std::function<void(void)> _fun, uint32_t n = 1000) {
     auto end = std::chrono::high_resolution_clock::now();
 
     std::cout << std::chrono::duration_cast<std::chrono::microseconds>(end-start).count() / static_cast<double>(n) << "us" << std::endl;
-
 }
 
 int test_spirit()
@@ -36,21 +31,21 @@ int test_spirit()
         if (str.empty() || str[0] == 'q' || str[0] == 'Q')
             break;
 
-        auto& calc = client::calculator;
+        auto& calc = mathjit::calculator;
 
         iterator_type iter = str.begin();
         iterator_type end = str.end();
         boost::spirit::x3::ascii::space_type space;
 
-        client::ast::expr e;
-        client::ast::printer print;
+        mathjit::ast::expr e;
+        mathjit::ast::printer print;
 
         std::unordered_map<char, double> vars = {
             {'x', 12.5},
             {'y', 1.0/3.0}
         };
-        client::ast::eval<> eval(vars);
-        client::ast::jit_eval jit(vars);
+        mathjit::ast::eval<> eval(vars);
+        mathjit::ast::jit_eval jit(vars);
         bool r = phrase_parse(iter, end, calc, space, e);
 
         if (r && iter == end)

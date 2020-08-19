@@ -6,11 +6,12 @@
 #include "ast.hpp"
 
 #include <memory>
+#include <unordered_map>
 
 using namespace asmjit;
 
 
-namespace client {
+namespace mathjit {
     namespace ast {
 
         struct jit_eval : public visitor<x86::Xmm> {

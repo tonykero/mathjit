@@ -2,10 +2,9 @@
 
 #include "ast.hpp"
 
-namespace client {
-    namespace calculator_grammar
+namespace mathjit {
+    namespace grammar
     {
-        using x3::uint_;
         using x3::char_;
         using x3::double_;
         using x3::alpha;
@@ -51,5 +50,5 @@ namespace client {
 
         auto calculator = expr;
     }
-    using calculator_grammar::calculator;
+    using grammar::calculator;
 }

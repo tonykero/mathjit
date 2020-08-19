@@ -8,7 +8,7 @@
 
 namespace x3 = boost::spirit::x3;
 
-namespace client
+namespace mathjit
 {
     namespace ast {
 
@@ -64,5 +64,5 @@ namespace client
     }
 }
 
-BOOST_FUSION_ADAPT_STRUCT(client::ast::expr, first, ops);
-BOOST_FUSION_ADAPT_STRUCT(client::ast::un_op, op, _operand);
+BOOST_FUSION_ADAPT_STRUCT(mathjit::ast::expr, first, ops);
+BOOST_FUSION_ADAPT_STRUCT(mathjit::ast::un_op, op, _operand);
