@@ -5,6 +5,8 @@
 namespace mathjit {
     namespace grammar
     {
+        //TODO: match xi (factor + i)
+        //TODO: Add math functions
         using x3::char_;
         using x3::double_;
         using x3::alpha;

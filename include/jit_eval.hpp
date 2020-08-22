@@ -14,6 +14,8 @@ using namespace asmjit;
 namespace mathjit {
     namespace ast {
 
+        // TODO: Complex numbers
+        // TODO: generate standalone function
         struct jit_eval : public visitor<x86::Xmm> {
             
             typedef double (*fun_type)(void);
