@@ -44,8 +44,13 @@ int test_spirit()
             {'x', 12.5},
             {'y', 1.0/3.0}
         };
-        mathjit::ast::eval<> eval(vars);
-        mathjit::ast::jit_eval jit(vars);
+        std::unordered_map<char, std::complex<double>> c_vars = {
+            {'x', std::complex<double>(12.5, 0)},
+            {'y', std::complex<double>(1.0/3.0)}
+        };
+        //mathjit::ast::complex_eval<> c_eval(c_vars);
+        mathjit::ast::eval<std::complex<double>>        eval(c_vars);
+        mathjit::ast::jit_eval      jit(vars);
         bool r = phrase_parse(iter, end, calc, space, e);
 
         if (r && iter == end)
@@ -54,7 +59,8 @@ int test_spirit()
             std::cout << "Parsing succeeded\n";
             std::cout << "-------------------------\n";
             print(e);
-            std::cout << "\n" << eval(e) << std::endl;
+            std::cout << "\n double: " << eval(e) << std::endl;
+            //std::cout << "\n complex: " << c_eval(e) << std::endl;
             jit.eval(e);
             std::cout << "\nJIT RESULT: " << jit.compute() << std::endl;
 

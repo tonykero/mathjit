@@ -84,6 +84,9 @@ namespace mathjit {
                 cc_ptr->movsd(r, cc_ptr->newDoubleConst(ConstPool::kScopeLocal, n));
                 return r;
             }
+            x86::Xmm operator()(complex n) const      {
+                return (*this)(n.imag);
+            }
             x86::Xmm operator()(char var) const {
                 return (*this)(vars_map.at(var));
             }

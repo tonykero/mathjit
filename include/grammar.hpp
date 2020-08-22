@@ -8,6 +8,7 @@ namespace mathjit {
         using x3::char_;
         using x3::double_;
         using x3::alpha;
+        using x3::optional;
 
         const x3::rule<class expr,  ast::expr>  expr("expr");
         const x3::rule<class term,  ast::expr>  term("term");
@@ -34,7 +35,7 @@ namespace mathjit {
             ;
         
         auto const factor_def =
-            double_             |
+            double_ >> -char_('i')   |
             '(' >> expr >> ')'  |
             alpha               |
             char_('+') >> factor|

@@ -6,15 +6,36 @@
 
 namespace mathjit {
     namespace ast {
+        // https://stackoverflow.com/a/30737105
+        template<class T> struct is_complex : std::false_type {};
+        template<class T> struct is_complex<std::complex<T>> : std::true_type {};
         template<typename T = double>
         struct eval : public visitor<T> {
             protected:
                 std::unordered_map<char, T>    vars_map;
             public:
+            using val_type = T;
+
             eval(const decltype(vars_map)& _vars_map) : vars_map(_vars_map) {}
 
             T operator()(nil)      const { return 0;}
             T operator()(double n) const { return n;}
+            T operator()(complex n) const {
+                T var;
+                constexpr bool B = is_complex<decltype(var)>{}();
+                if constexpr(B) {
+                    double real = 0.0, imag = 0.0;
+                    if(n.i.has_value()) {
+                        imag = n.imag;
+                    } else {
+                        real = n.imag;
+                    }
+                    return T(real, imag);
+                } else {
+                    return n.imag;
+                }
+            }
+
             T operator()(char var) const {
                 return vars_map.at(var);
             }
