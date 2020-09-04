@@ -38,3 +38,7 @@ include_directories(${BOOST_SPIRIT_INCLUDE_DIRS})
 
 add_executable(mathjit ${SOURCES})
 target_link_libraries(mathjit PUBLIC ${ASMJIT_LIB})
+
+# explicitly enable C++17
+set_property(TARGET mathjit PROPERTY CXX_STANDARD 17)
+set_property(TARGET mathjit PROPERTY CXX_STANDARD_REQUIRED ON)
