@@ -50,7 +50,7 @@ int test_spirit()
         };
         //mathjit::ast::complex_eval<> c_eval(c_vars);
         mathjit::ast::eval<std::complex<double>>        eval(c_vars);
-        mathjit::ast::jit_eval      jit(vars);
+        mathjit::ast::jit_eval<std::complex<double>>    jit(c_vars);
         bool r = phrase_parse(iter, end, calc, space, e);
 
         if (r && iter == end)
