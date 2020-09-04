@@ -123,25 +123,17 @@ namespace mathjit {
                     return state;
                     case '*':
                     if constexpr(is_complex) {
-                        x86::Xmm xu_yv = cc_ptr->newXmmPd();
-                        cc_ptr->movapd(xu_yv, state);           // xu_yv = (x + yi)
-                        cc_ptr->mulpd(xu_yv, rhs);            // xu_yv = (xu + yvi)
-
-                        x86::Xmm xv_yu = cc_ptr->newXmmPd();
-                        cc_ptr->movapd(xv_yu, state);           // xv_yu    = (x + yi)
-                        cc_ptr->shufpd(rhs, rhs, 0b00010001);   // e        = (v + ui)
-                        cc_ptr->mulpd(xv_yu, rhs);            // xv_yu    = (xv + yui)
-
-                        cc_ptr->hsubpd(xu_yv, xu_yv);       // xu_yv = (xu-yv) + (xu - yvi)
-                        cc_ptr->haddpd(xv_yu, xv_yu);       // xv_yu = (xv+yu) + (xv + yui)
-                        cc_ptr->shufpd(xu_yv, xv_yu, 0);    // xu_yv = (xu-yv) + (xv + yui)
-                        cc_ptr->movapd(state, xu_yv);
+                        complex_mul(state, rhs);
                     } else {
                         cc_ptr->mulsd(state, rhs);
                     }
                     return state;
                     case '/':
-                    cc_ptr->divsd(state, rhs);
+                    if constexpr(is_complex) {
+                        complex_div(state, rhs);
+                    } else {
+                        cc_ptr->divsd(state, rhs);
+                    }
                     return state;
                     case '^':
                     invoke2d(&(std::pow), {state, state, rhs});
@@ -206,6 +198,41 @@ namespace mathjit {
                 x86::Mem mem = cc_ptr->newStack(16, 8);
                 cc_ptr->movapd(mem, _xmm);
                 return mem;
+            }
+
+            x86::Xmm complex_mul(x86::Xmm& state, x86::Xmm& rhs) const {
+                //complex multiplication (xu - yv) + (xv + yu)
+                
+                x86::Xmm xu_yv = cc_ptr->newXmmPd();
+                cc_ptr->movapd(xu_yv, state);           // xu_yv = (x + yi)
+                cc_ptr->mulpd(xu_yv, rhs);              // xu_yv = (xu + yvi)
+                
+                x86::Xmm xv_yu = cc_ptr->newXmmPd();
+                cc_ptr->movapd(xv_yu, state);           // xv_yu = (x + yi)
+                cc_ptr->shufpd(rhs, rhs, 0b00010001);   // e     = (v + ui)
+                
+                cc_ptr->mulpd(xv_yu, rhs);              // xv_yu = (xv + yui)
+                cc_ptr->hsubpd(xu_yv, xu_yv);           // xu_yv = (xu-yv) + (xu - yvi)
+                cc_ptr->haddpd(xv_yu, xv_yu);           // xv_yu = (xv+yu) + (xv + yui)
+                cc_ptr->shufpd(xu_yv, xv_yu, 0);        // xu_yv = (xu-yv) + (xv + yui)
+                cc_ptr->movapd(state, xu_yv);
+                return state;
+            }
+
+            x86::Xmm complex_div(x86::Xmm& state, x86::Xmm& rhs) const {
+                //complex division d / e = d * (1/e)
+                // s = u² + v²
+                // d * 1/e = d * ( (u/s) - (v/s)i)
+
+                x86::Xmm s = cc_ptr->newXmmPd();
+                cc_ptr->movapd(s, rhs);       // s = (u + vi)
+                cc_ptr->mulpd(s, s);        // s = (u² + v²i)
+                cc_ptr->haddpd(s, s);       // s = ((u²+v²) + (u²+v²i))
+                x86::Xmm res = complexAsXmm(std::complex<double>(1.0, -1.0));
+                cc_ptr->mulpd(res, rhs);    // res = (u - vi)
+                cc_ptr->divpd(res, s);    // res = (u/(u²+v²) - v/(u²+v²i))
+                
+                return complex_mul(state, res);
             }
         };
     }
