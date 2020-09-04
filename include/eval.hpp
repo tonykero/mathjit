@@ -7,8 +7,8 @@
 namespace mathjit {
     namespace ast {
         // https://stackoverflow.com/a/30737105
-        template<class T> struct is_complex : std::false_type {};
-        template<class T> struct is_complex<std::complex<T>> : std::true_type {};
+        template<class T> struct is_complex                     : std::false_type   {};
+        template<class T> struct is_complex<std::complex<T>>    : std::true_type    {};
         template<typename T = double>
         struct eval : public visitor<T> {
             protected:

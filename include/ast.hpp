@@ -57,12 +57,11 @@ namespace mathjit
             void operator()(double n)   const { std::cout << n;}
             void operator()(complex n)  const {
                 double real = 0.0, imag = 0.0;
-                if(n.i.has_value()) {
-                    imag = n.imag;
+                if(n.i) {
+                    std::cout << std::complex<double>(0, n.imag);
                 } else {
-                    real = n.imag;
+                    std::cout << n.imag;
                 }
-                std::cout << std::complex<double>(real, imag);
             }
             void operator()(char var)   const { std::cout << var;}
             void operator()(un_op op)   const {
