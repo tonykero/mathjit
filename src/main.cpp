@@ -48,9 +48,9 @@ int test_spirit()
             {'x', std::complex<double>(12.5, 0)},
             {'y', std::complex<double>(1.0/3.0)}
         };
-        //mathjit::ast::complex_eval<> c_eval(c_vars);
-        mathjit::ast::eval<std::complex<double>>        eval(c_vars);
-        mathjit::ast::jit_eval<std::complex<double>>    jit(c_vars);
+        using base_type = std::complex<double>;
+        mathjit::ast::eval<base_type>        eval(c_vars);
+        mathjit::ast::jit_eval<base_type>    jit(c_vars);
         bool r = phrase_parse(iter, end, calc, space, e);
 
         if (r && iter == end)

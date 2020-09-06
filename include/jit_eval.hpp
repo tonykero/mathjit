@@ -13,8 +13,6 @@ using namespace asmjit;
 
 namespace mathjit {
     namespace ast {
-        
-        // TODO: Complex numbers
         // TODO: generate standalone function
         template <typename T = double>
         struct jit_eval : public visitor<x86::Xmm> {
@@ -32,7 +30,7 @@ namespace mathjit {
                 
                 static constexpr bool is_complex = typename is_complex<T>{};
             public:
-
+            using c_type = std::complex<double>;
 
             jit_eval(const decltype(vars_map)& _vars_map) : vars_map(_vars_map), rt(), code() {
                 code.init(rt.environment());
@@ -50,6 +48,7 @@ namespace mathjit {
                 x86::Gp ret_ptr     = cc_ptr->newInt64("ret_ptr");
                 x86::Mem xmm_ret    = xmmAsMem((*this)(e));
                 cc_ptr->lea(ret_ptr, xmm_ret);
+
                 cc_ptr->ret(ret_ptr);
 
                 cc_ptr->endFunc();
@@ -63,7 +62,7 @@ namespace mathjit {
                     double* ret = fn();
                     double real = ret[0];
                     double imag = ret[1];
-                    return std::complex<double>(real, imag);
+                    return c_type(real, imag);
                 } else {
                     return *fn();
                 }
@@ -81,9 +80,9 @@ namespace mathjit {
                 {
                     // interpret as complex
                     if(n.i) {
-                        return complexAsXmm(std::complex<double>(0, n.imag));
+                        return complexAsXmm(c_type(0, n.imag));
                     } else {
-                        return complexAsXmm(std::complex<double>(n.imag, 0));
+                        return complexAsXmm(c_type(n.imag, 0));
                     }
                 } else {
                     // interpret as double anyway
@@ -96,7 +95,7 @@ namespace mathjit {
             x86::Xmm operator()(un_op op) const {
                 x86::Xmm rhs = boost::apply_visitor(*this, op._operand);
 
-                x86::Xmm ret = complexAsXmm(std::complex<double>(0,0));
+                x86::Xmm ret = complexAsXmm(c_type(0,0));
                 switch(op.op) {
                     case '+':
                             if constexpr(is_complex){ cc_ptr->addpd(ret, rhs); }
@@ -136,7 +135,19 @@ namespace mathjit {
                     }
                     return state;
                     case '^':
-                    invoke2d(&(std::pow), {state, state, rhs});
+                    if constexpr(is_complex) {
+                        // TODO: costly
+                        x86::Gp state_ptr   = xmmAsPtr(state);
+                        x86::Gp rhs_ptr     = xmmAsPtr(rhs);
+                        auto pow_wrapper = make_wrapper2c<c_type,0>(&std::pow);
+                        uint64_t pow_ptr = reinterpret_cast<uint64_t>(&pow_wrapper.fun);
+
+                        invoke2c(pow_ptr, {state_ptr, state_ptr, rhs_ptr});
+
+                        cc_ptr->movapd(state, x86::ptr(state_ptr));
+                    } else {
+                        invoke2d(&(std::pow), {state, state, rhs});
+                    }
                     return state;
                 }
                 // unreachable
@@ -152,12 +163,11 @@ namespace mathjit {
 
             private:
             template<typename T, typename... Args>
-            Error invoke(T(*fun_ptr)(Args...), std::initializer_list<x86::Xmm> list) const {
-                uint64_t fun_ptr_int = reinterpret_cast<uint64_t>(fun_ptr);
+            Error invoke(uint64_t fun_ptr, std::initializer_list<asmjit::BaseReg> list) const {
                 InvokeNode* invokeNode;
-                Error err = cc_ptr->invoke(&invokeNode, fun_ptr_int, FuncSignatureT<T, Args...>());
+                Error err = cc_ptr->invoke(&invokeNode, fun_ptr, FuncSignatureT<T, Args...>());
                 uint32_t index = 0;
-                for(const x86::Xmm* it = list.begin(); it != list.end(); it++) {
+                for(const asmjit::BaseReg* it = list.begin(); it != list.end(); it++) {
                     if(it == list.begin()) { invokeNode->setRet(0, *it); }
                     else
                     {
@@ -168,11 +178,49 @@ namespace mathjit {
 
                 return err;
             }
-            Error invoke2d(double(*fun_ptr)(double, double), std::initializer_list<x86::Xmm> list) const {
-                return invoke(fun_ptr, list);
+            Error invoke2d(double(*fun_ptr)(double, double), std::initializer_list<asmjit::BaseReg> list) const {
+                uint64_t fun_ptr_int = reinterpret_cast<uint64_t>(fun_ptr);
+                return invoke<double, double, double>(fun_ptr_int, list);
             }
-            Error invoke1d(double(*fun_ptr)(double), std::initializer_list<x86::Xmm> list) const {
-                return invoke(fun_ptr, list);
+            Error invoke1d(double(*fun_ptr)(double), std::initializer_list<asmjit::BaseReg> list) const {
+                uint64_t fun_ptr_int = reinterpret_cast<uint64_t>(fun_ptr);
+                return invoke<double, double>(fun_ptr_int, list);
+            }
+
+            template <typename T, uint32_t C = 0>
+            auto make_wrapper2c(T(*fun_ptr)(const T&, const T&)) const {
+                static T(*_ptr)(const T&, const T&) = fun_ptr;
+
+                struct A {
+                    static double* fun(double* a, double* b) {
+                        T   ca = T(a[0], a[1]),
+                        cb = T(b[0], b[1]);
+                        T cret = _ptr(ca, cb);
+                        double* ret = new double[2]{cret.real(), cret.imag()};
+                        return ret;
+                    } 
+                } a;
+                return a;
+            }
+
+            template <typename T, uint32_t C = 0>
+            auto make_wrapper1c(T(*fun_ptr)(const T&)) const {
+                static T(*_ptr)(const T&) = fun_ptr;
+                struct A {
+                    static double* fun(double* a) {
+                        T   ca = T(a[0], a[1]);
+                        T cret = _ptr(ca);
+                        double* ret = new double[2]{cret.real(), cret.imag()};
+                        return ret;
+                    } 
+                } a;
+                return a;
+            }
+            Error invoke2c(uint64_t fun_ptr, std::initializer_list<asmjit::BaseReg> list ) const {
+                return invoke<uint64_t, uint64_t, uint64_t>(fun_ptr, list);
+            }
+            Error invoke1c(uint64_t fun_ptr, std::initializer_list<asmjit::BaseReg> list ) const {
+                return invoke<uint64_t, uint64_t>(fun_ptr, list);
             }
 
             x86::Xmm doubleAsXmm(double n) const {
@@ -181,24 +229,39 @@ namespace mathjit {
                 return r;
             }
 
-            x86::Mem complexAsMem(std::complex<double> n) const {
+            x86::Mem complexAsMem(c_type n) const {
                 double data[2] = {n.real(), n.imag()};
 
                 return cc_ptr->newConst(ConstPool::kScopeLocal, data, sizeof(double)*2);
             }
 
-            x86::Xmm complexAsXmm(std::complex<double> n) const {
+            x86::Xmm complexAsXmm(c_type n) const {
                 x86::Mem comp   = complexAsMem(n);
                 x86::Xmm xmm    = cc_ptr->newXmmPd();
                 cc_ptr->movapd(xmm, comp);
                 return xmm;
             }
 
-            x86::Mem xmmAsMem(x86::Xmm _xmm) {
+            x86::Mem xmmAsMem(x86::Xmm _xmm) const {
                 x86::Mem mem = cc_ptr->newStack(16, 8);
                 cc_ptr->movapd(mem, _xmm);
                 return mem;
             }
+            
+            x86::Xmm memAsXmm(x86::Mem _mem) const {
+                x86::Xmm xmm = cc_ptr->newXmmPd();
+                cc_ptr->movapd(xmm, _mem);
+                return xmm;
+            }
+            x86::Gp memAsPtr(x86::Mem mem) const {
+                x86::Gp ptr = cc_ptr->newInt64();
+                cc_ptr->lea(ptr, mem);
+                return ptr;
+            }
+            x86::Gp xmmAsPtr(x86::Xmm xmm) const {
+                return memAsPtr(xmmAsMem(xmm));
+            }
+            
 
             x86::Xmm complex_mul(x86::Xmm& state, x86::Xmm& rhs) const {
                 //complex multiplication (xu - yv) + (xv + yu)
@@ -228,7 +291,7 @@ namespace mathjit {
                 cc_ptr->movapd(s, rhs);       // s = (u + vi)
                 cc_ptr->mulpd(s, s);        // s = (u² + v²i)
                 cc_ptr->haddpd(s, s);       // s = ((u²+v²) + (u²+v²i))
-                x86::Xmm res = complexAsXmm(std::complex<double>(1.0, -1.0));
+                x86::Xmm res = complexAsXmm(c_type(1.0, -1.0));
                 cc_ptr->mulpd(res, rhs);    // res = (u - vi)
                 cc_ptr->divpd(res, s);    // res = (u/(u²+v²) - v/(u²+v²i))
                 
