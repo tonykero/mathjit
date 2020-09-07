@@ -36,8 +36,7 @@ namespace mathjit {
 
                 fun_type fn;
 
-                
-                static constexpr bool is_complex = typename is_complex<T>{};
+                static constexpr bool is_complex = is_complex_v<T>;
             public:
             using c_type = std::complex<double>;
 
@@ -145,10 +144,7 @@ namespace mathjit {
                     return state;
                     case '^':
                     if constexpr(is_complex) {
-                        auto pow_wrapper = make_wrapper2c<c_type,0>(&std::pow);
-                        uint64_t pow_ptr = reinterpret_cast<uint64_t>(&pow_wrapper.fun);
-
-                        invoke2c(pow_ptr, {state, state, rhs});
+                        wrap_invoke2c<0>((&std::pow), {state, state, rhs});
                     } else {
                         invoke2d(&(std::pow), {state, state, rhs});
                     }
@@ -191,15 +187,15 @@ namespace mathjit {
                 return invoke<double, double>(fun_ptr_int, list);
             }
 
-            template <typename T, uint32_t C = 0>
-            auto make_wrapper2c(T(*fun_ptr)(const T&, const T&)) const {
-                static T(*_ptr)(const T&, const T&) = fun_ptr;
+            template <uint32_t _id = 0>
+            auto make_wrapper2c(T(*fun_ptr)(const c_type&, const c_type&)) const {
+                static c_type(*_ptr)(const c_type&, const c_type&) = fun_ptr;
 
                 struct A {
                     static __m128d fun(__m128d a, __m128d b) {
-                        T   ca = T(a.m128d_f64[0], a.m128d_f64[1]),
-                            cb = T(b.m128d_f64[0], b.m128d_f64[1]);
-                        T   cret = _ptr(ca, cb);
+                        c_type  ca = c_type(a.m128d_f64[0], a.m128d_f64[1]),
+                                cb = c_type(b.m128d_f64[0], b.m128d_f64[1]);
+                        c_type  cret = _ptr(ca, cb);
 
                         __m128d ret;
                         ret.m128d_f64[0] = cret.real();
@@ -210,13 +206,13 @@ namespace mathjit {
                 return a;
             }
 
-            template <typename T, uint32_t C = 0>
-            auto make_wrapper1c(T(*fun_ptr)(const T&)) const {
-                static T(*_ptr)(const T&) = fun_ptr;
+            template <uint32_t _id = 0>
+            auto make_wrapper1c(c_type(*fun_ptr)(const c_type&)) const {
+                static c_type(*_ptr)(const c_type&) = fun_ptr;
                 struct A {
                     static __m128d fun(__m128d a) {
-                        T   ca = T(a.m128d_f64[0], a.m128d_f64[1]);
-                        T   cret = _ptr(ca);
+                        c_type   ca = c_type(a.m128d_f64[0], a.m128d_f64[1]);
+                        c_type   cret = _ptr(ca);
                         __m128d ret;
                         ret.m128d_f64[0] = cret.real();
                         ret.m128d_f64[1] = cret.imag();
@@ -230,6 +226,14 @@ namespace mathjit {
             }
             Error invoke1c(uint64_t fun_ptr, std::initializer_list<asmjit::BaseReg> list ) const {
                 return invoke<__m128d, __m128d>(fun_ptr, list);
+            }
+
+            template <uint32_t _id = 0>
+            Error wrap_invoke2c(T(*fun_ptr)(const c_type&, const c_type&), std::initializer_list<asmjit::BaseReg> list) const {
+                auto wrapper = make_wrapper2c<_id>(fun_ptr);
+                uint64_t ptr = reinterpret_cast<uint64_t>(&wrapper.fun);
+
+                return invoke2c(ptr, list);
             }
 
             x86::Xmm doubleAsXmm(double n) const {
