@@ -5,14 +5,23 @@
 
 #include "ast.hpp"
 
+#include <emmintrin.h>
 #include <memory>
 #include <unordered_map>
+
+namespace asmjit {
+    namespace Type {
+        template<>
+        struct IdOfT<__m128d> { enum : uint32_t { kTypeId = _kIdVec128Start }; };
+    }
+}
 
 using namespace asmjit;
 
 
 namespace mathjit {
     namespace ast {
+        
         // TODO: generate standalone function
         template <typename T = double>
         struct jit_eval : public visitor<x86::Xmm> {
@@ -136,15 +145,10 @@ namespace mathjit {
                     return state;
                     case '^':
                     if constexpr(is_complex) {
-                        // TODO: costly
-                        x86::Gp state_ptr   = xmmAsPtr(state);
-                        x86::Gp rhs_ptr     = xmmAsPtr(rhs);
                         auto pow_wrapper = make_wrapper2c<c_type,0>(&std::pow);
                         uint64_t pow_ptr = reinterpret_cast<uint64_t>(&pow_wrapper.fun);
 
-                        invoke2c(pow_ptr, {state_ptr, state_ptr, rhs_ptr});
-
-                        cc_ptr->movapd(state, x86::ptr(state_ptr));
+                        invoke2c(pow_ptr, {state, state, rhs});
                     } else {
                         invoke2d(&(std::pow), {state, state, rhs});
                     }
@@ -192,13 +196,16 @@ namespace mathjit {
                 static T(*_ptr)(const T&, const T&) = fun_ptr;
 
                 struct A {
-                    static double* fun(double* a, double* b) {
-                        T   ca = T(a[0], a[1]),
-                        cb = T(b[0], b[1]);
-                        T cret = _ptr(ca, cb);
-                        double* ret = new double[2]{cret.real(), cret.imag()};
+                    static __m128d fun(__m128d a, __m128d b) {
+                        T   ca = T(a.m128d_f64[0], a.m128d_f64[1]),
+                            cb = T(b.m128d_f64[0], b.m128d_f64[1]);
+                        T   cret = _ptr(ca, cb);
+
+                        __m128d ret;
+                        ret.m128d_f64[0] = cret.real();
+                        ret.m128d_f64[1] = cret.imag();
                         return ret;
-                    } 
+                    }
                 } a;
                 return a;
             }
@@ -207,20 +214,22 @@ namespace mathjit {
             auto make_wrapper1c(T(*fun_ptr)(const T&)) const {
                 static T(*_ptr)(const T&) = fun_ptr;
                 struct A {
-                    static double* fun(double* a) {
-                        T   ca = T(a[0], a[1]);
-                        T cret = _ptr(ca);
-                        double* ret = new double[2]{cret.real(), cret.imag()};
+                    static __m128d fun(__m128d a) {
+                        T   ca = T(a.m128d_f64[0], a.m128d_f64[1]);
+                        T   cret = _ptr(ca);
+                        __m128d ret;
+                        ret.m128d_f64[0] = cret.real();
+                        ret.m128d_f64[1] = cret.imag();
                         return ret;
                     } 
                 } a;
                 return a;
             }
             Error invoke2c(uint64_t fun_ptr, std::initializer_list<asmjit::BaseReg> list ) const {
-                return invoke<uint64_t, uint64_t, uint64_t>(fun_ptr, list);
+                return invoke<__m128d, __m128d, __m128d>(fun_ptr, list);
             }
             Error invoke1c(uint64_t fun_ptr, std::initializer_list<asmjit::BaseReg> list ) const {
-                return invoke<uint64_t, uint64_t>(fun_ptr, list);
+                return invoke<__m128d, __m128d>(fun_ptr, list);
             }
 
             x86::Xmm doubleAsXmm(double n) const {
